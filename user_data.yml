@@ -1,0 +1,93 @@
+#cloud-config
+groups:
+  - docker
+users:
+  - default
+  # the docker service account
+  - name: docker-service
+    groups: docker
+  - name: ubuntu
+    shell: /usr/bin/bash
+    sudo: ALL=(ALL:ALL) NOPASSWD:ALL     
+    groups: docker
+    ssh_authorized_keys:
+      - {SSH_PUBLIC_KEY}
+apt:
+  sources:
+    tailscale:
+      source: deb [trusted=yes] https://pkgs.tailscale.com/stable/ubuntu focal main
+package_upgrade: true
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg-agent
+  - software-properties-common
+  - tailscale
+write_files:
+  - path: /home/ubuntu/Caddyfile
+    permissions: "0644"
+    content: |
+      {
+        email {OWNER_EMAIL_ADDRESS}
+      }
+
+      {DOMAINS_TO_PROXY}
+
+  - path: /home/ubuntu/docker-compose.yml
+    permissions: "0644"
+    content: |
+      version: "3"
+
+      services:
+        caddy:
+          image: caddy:2
+          restart: unless-stopped
+          ports:
+            - 80:80
+            - 443:443
+          volumes:
+            - /home/ubuntu/Caddyfile:/etc/caddy/Caddyfile
+            
+  - path: /etc/systemd/system/docker-compose.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Docker Compose Application Service
+      Requires=docker.service
+      After=docker.service
+
+      [Service]
+      User=ubuntu
+      Group=docker
+      WorkingDirectory=/home/ubuntu
+      ExecStart=/usr/local/bin/docker-compose up
+      ExecStop=/usr/local/bin/docker-compose down
+      TimeoutStartSec=0
+      Restart=on-failure
+      StartLimitIntervalSec=60
+      StartLimitBurst=3
+
+      [Install]
+      WantedBy=multi-user.target
+runcmd:
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  - sudo apt-get -y update
+  - sudo apt-get -y install docker-ce docker-ce-cli containerd.io
+  - sudo systemctl enable docker
+  - sudo curl -L "https://github.com/docker/compose/releases/download/1.25.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  - sudo chmod +x /usr/local/bin/docker-compose
+  - tailscale up -authkey='{TS_AUTH_KEY}'
+  - sed -i '1i PermitRootLogin no' /etc/ssh/sshd_config
+  - sed -i '1i PasswordAuthentication no' /etc/ssh/sshd_config
+  - sed -i '1i ClientAliveInterval 5' /etc/ssh/sshd_config
+  - systemctl --no-block restart sshd
+  - replaceip=$(tailscale status | grep "umbrel " | awk '{ print $1 }')
+  - sed -i "s/{ADDRESS_TO_PROXY}/$replaceip/" /home/ubuntu/Caddyfile
+  - systemctl daemon-reload
+  - systemctl start docker-compose
+  - systemctl enable docker-compose
+power_state:
+  mode: reboot
+  message: Restarting after installing docker & docker-compose
