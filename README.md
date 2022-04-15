@@ -26,7 +26,7 @@ This tool will create a server in Hetzner cloud (cost is 4 EUR / mo) along with 
 - save the auth token for later use!
 - go to https://tailscale.com and log in
 - click settings -> personal settings -> keys -> auth keys -> generate auth key
-- set resuable -> yes, pre-authorized -> yes, click generate key
+- set pre-authorized -> yes, click generate key
 - save the auth key for later use!
 - on your computer clone this repository
 - `cd umbrel-https-proxy`
