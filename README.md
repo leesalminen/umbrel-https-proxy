@@ -2,6 +2,8 @@
 
 You can use this tool to set up a clearnet HTTPS proxy to multiple apps running on your Umbrel node.
 
+YouTube demo video: https://youtu.be/pFIothCfT3Y
+
 # Pre-requisites
 
 - Umbrel node fully configured
